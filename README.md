@@ -1,178 +1,266 @@
-# 🚀 Projeto: change-governance-service
+# 🚀 change-governance-service
 
-## 🎯 Objetivo
+API de **Governança de Mudanças (GMUD / Change Management)** desenvolvida em Spring Boot, criada para integrar processos de aprovação corporativa com pipelines modernas de CI/CD.
 
-API para controle de mudanças (GMUD / Change Management), simulando fluxo empresarial:
+Este projeto demonstra como mudanças podem ser **solicitadas, aprovadas, implantadas e auditadas** de forma automatizada.
 
-- Solicitar mudança
-- Aprovar mudança
-- Consultar mudanças
-- Alterar status
-- Histórico básico
+---
 
-> [!NOTE]
-> Conectando com Jenkins pipeline e deploy approval.
+# 🎯 Objetivo
 
-## 🏗️ Arquitetura inicial
+Simular um fluxo empresarial real de Change Management:
 
-```console
-src/main/java/com/leonardo/devops/changerequest
-│
-├── controller
-├── service
-├── repository
-├── entity
-├── dto
-├── enums
-└── config
-```
+- Solicitar mudança  
+- Aprovar ou rejeitar mudança  
+- Consultar mudanças  
+- Liberar deploy somente após aprovação  
+- Registrar deploy automatizado  
+- Controlar redeploy com justificativa obrigatória  
+- Manter rastreabilidade operacional  
 
+---
 
-## 📦 Estrutura recomendada
+# 🏗️ Arquitetura Atual
 
-```console
-change-governance-service
-├── controller
-│   └── ChangeRequestController.java
-│
-├── service
-│   └── ChangeRequestService.java
-│
-├── repository
-│   └── ChangeRequestRepository.java
-│
-├── entity
-│   └── ChangeRequest.java
-│
-├── dto
-│   ├── ChangeRequestRequest.java
-│   └── ChangeRequestResponse.java
-│
-├── enums
-│   └── ChangeStatus.java
-│
-└── ChangeRequestServiceApplication.java
-```
+    src/main/java/io/viana/change_governance_service/
 
-## 🧩 Entidade principal
+    ├── controller
+    ├── service
+    ├── repository
+    ├── entity
+    ├── dto
+    ├── enums
+    ├── handler
+    └── config
 
-`ChangeRequest.java`
+---
 
-Campos recomendados:
+# 🧩 Entidade Principal
 
-```java
-UUID id;
-String title;
-String description;
-String requester;
-String systemName;
-String riskLevel;
-ChangeStatus status;
-LocalDateTime createdAt;
-LocalDateTime approvedAt;
-String approvedBy;
-```
+## ChangeRequest
 
-## 🔖 Enum de Status
+Campos atuais:
 
-`ChangeStatus.java`
+    UUID id;
+    String title;
+    String description;
+    String requester;
+    String systemName;
+    String riskLevel;
 
-```java
-PENDING
-APPROVED
-REJECTED
-DEPLOYED
-FAILED
-ROLLED_BACK
-```
+    ChangeStatus status;
 
-## 🌐 Endpoints REST
+    LocalDateTime createdAt;
+    LocalDateTime approvedAt;
+    String approvedBy;
 
-Criar mudança
+    LocalDateTime deployedAt;
+    String deployedBy;
 
-```bash
-POST /api/change-requests
-```
+    Integer deployCount;
+    String lastDeployReason;
 
-Body:
+---
 
-```json
-{
-  "title": "Deploy versão 1.0.3",
-  "description": "Correção de bug login",
-  "requester": "Leonardo",
-  "systemName": "Portal Cliente",
-  "riskLevel": "LOW"
-}
-```
+# 🔖 Status da Mudança
 
-Listar mudanças
+    PENDING
+    APPROVED
+    REJECTED
+    DEPLOYED
 
-```bash
-GET /api/change-requests
-```
+### Fluxo principal
 
-Buscar por ID
+    PENDING → APPROVED → DEPLOYED
 
-```bash
-GET /api/change-requests/{id}
-```
+ou
 
-Aprovar mudança
+    PENDING → REJECTED
 
-```bash
-PUT /api/change-requests/{id}/approve
-```
+---
 
-Body:
+# 🌐 Endpoints REST
 
-```json
-{
-  "approvedBy": "Gestor TI"
-}
-```
+## Criar mudança
 
-Rejeitar mudança
+    POST /api/change-requests
 
-```bash
-PUT /api/change-requests/{id}/reject
-```
+### Body
 
-Marcar deploy realizado
+    {
+      "title": "Deploy versão 1.0.3",
+      "description": "Correção de bug login",
+      "requester": "Leonardo",
+      "systemName": "payment-service",
+      "riskLevel": "LOW"
+    }
 
-```bash
-PUT /api/change-requests/{id}/deploy
-```
+## Listar mudanças
 
-## 🔥 Como isso conecta com Jenkins
+    GET /api/change-requests
 
-Pipeline pode chamar API:
+## Buscar por ID
 
-1. Antes do deploy:
+    GET /api/change-requests/{id}
 
-```console
-Buscar mudança aprovada
-```
+## Aprovar mudança
 
-Depois do deploy:
+    PUT /api/change-requests/{id}/approve
 
-```console
-Atualizar status para DEPLOYED
-```
+### Body
 
-## 📄 Exemplo de fluxo real
+    {
+      "approvedBy": "Gestor TI"
+    }
 
-```console
-1. Usuário cria mudança
-2. Gestor aprova
-3. Jenkins consulta aprovação
-4. Jenkins executa deploy
-5. API marca DEPLOYED
-6. Evidence.json gerado
-```
+## Rejeitar mudança
 
-## 🧠 Banco de dados
+    PUT /api/change-requests/{id}/reject
 
-Inicialmente:
+## Deploy / Redeploy
 
-H2 ou PostgreSQL via Docker.
+    PUT /api/change-requests/{id}/deploy
+
+### Primeiro deploy
+
+    {
+      "executedBy": "Jenkins"
+    }
+
+### Redeploy (obrigatório informar motivo)
+
+    {
+      "executedBy": "Jenkins",
+      "reason": "Container restart after maintenance"
+    }
+
+---
+
+# 🛡️ Regras de Negócio
+
+## Aprovação
+
+Somente mudanças com status:
+
+    PENDING
+
+podem ser aprovadas ou rejeitadas.
+
+## Deploy
+
+Somente mudanças com status:
+
+    APPROVED
+
+podem ser implantadas pela primeira vez.
+
+## Redeploy Controlado
+
+Mudanças já implantadas (`DEPLOYED`) só podem receber novo deploy com justificativa obrigatória.
+
+Exemplos:
+
+    Container restart
+    Rollback retry
+    Replica rebuild
+    Host maintenance
+
+---
+
+# 🔥 Caso Real Executado
+
+Registro real obtido no sistema:
+
+    {
+      "status": "DEPLOYED",
+      "approvedBy": "Gestor TI",
+      "deployedBy": "Jenkins",
+      "deployCount": 2,
+      "lastDeployReason": "Container restart"
+    }
+
+Isso comprova:
+
+- Aprovação humana  
+- Deploy automatizado  
+- Redeploy auditado  
+- Histórico operacional  
+
+---
+
+# 🤖 Integração com Jenkins
+
+Pipeline pode executar:
+
+## Antes do deploy
+
+    Consultar se mudança está APPROVED
+
+## Após deploy
+
+    Atualizar status para DEPLOYED
+    Registrar executor
+    Registrar motivo (se redeploy)
+
+---
+
+# 📄 Fluxo Completo
+
+    1. Usuário cria mudança
+    2. Gestor aprova
+    3. GitHub mergeia release
+    4. Jenkins inicia pipeline
+    5. Jenkins consulta API
+    6. Deploy executado
+    7. API registra DEPLOYED
+    8. Evidence.json gerado
+
+---
+
+# 🧠 Banco de Dados
+
+## Ambiente Local
+
+    H2 Database
+
+## Ambiente Principal
+
+    PostgreSQL
+
+## Profiles
+
+    local
+    prod
+
+---
+
+# 🛠️ Stack Tecnológica
+
+    Java 17
+    Spring Boot 3
+    Spring Web
+    Spring Data JPA
+    H2
+    PostgreSQL
+    Maven
+    Swagger / OpenAPI
+    Docker
+    Jenkins
+    GitHub Actions
+
+---
+
+# 📈 Roadmap
+
+- Histórico detalhado de eventos  
+- Janela de mudança  
+- Aprovação por nível de risco  
+- Dashboard de métricas  
+- Multi-service governance  
+
+---
+
+# 🔗 Ecossistema Relacionado
+
+- payment-service  
+- devops-governance-platform  
