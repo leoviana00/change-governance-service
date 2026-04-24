@@ -262,5 +262,5 @@ Pipeline pode executar:
 
 # 🔗 Ecossistema Relacionado
 
-- payment-service  
-- devops-governance-platform  
+- [devops-governance-platform](https://github.com/leoviana00/devops-governance-platform)
+- [payment-service](https://github.com/leoviana00/payment-service)
